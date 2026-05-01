@@ -96,7 +96,7 @@
             let html = "";
             snap.forEach(hijo => {
                 const num = hijo.key.replace('puesto_', '');
-                html += `<div class="badge">P-${num}</div>`;
+                html += `<div class="badge">${num}</div>`;
             });
             $('grid-puestos').innerHTML = html || "<span style='font-size:13px;color:#888;'>Solo tú</span>";
         });
