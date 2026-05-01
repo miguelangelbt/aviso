@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Notificaciones</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 40px; 
+            text-align: center; 
+            background-color: #f4f4f9;
+        }
+        .contenedor {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin: auto;
+        }
+        button { 
+            padding: 12px 24px; 
+            font-size: 16px; 
+            margin: 10px; 
+            cursor: pointer; 
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+        }
+        #btnPermiso { background-color: #008CBA; }
+        #btnNotificar { background-color: #4CAF50; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #estado { 
+            margin-top: 20px; 
+            font-weight: bold; 
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor">
+        <h2>Prueba de Notificación de Windows</h2>
+        <p>1. Primero, el navegador debe pedirte permiso.<br>2. Después, podrás lanzar el aviso.</p>
+
+        <button id="btnPermiso">1. Solicitar Permiso</button>
+        <button id="btnNotificar" disabled>2. Lanzar Aviso</button>
+
+        <div id="estado" style="background-color: #e9ecef;">Estado: Esperando acción...</div>
+    </div>
+
+    <script>
+        const btnPermiso = document.getElementById('btnPermiso');
+        const btnNotificar = document.getElementById('btnNotificar');
+        const estadoDiv = document.getElementById('estado');
+
+        // 1. Comprobar si el navegador tiene bloqueadas las notificaciones por defecto
+        if (!("Notification" in window)) {
+            estadoDiv.innerText = "Tu navegador no soporta notificaciones de escritorio.";
+            estadoDiv.style.backgroundColor = "#ffdddd";
+        } else if (Notification.permission === "granted") {
+            btnPermiso.disabled = true;
+            btnNotificar.disabled = false;
+            estadoDiv.innerText = "Ya diste permiso anteriormente. Pulsa 'Lanzar Aviso'.";
+        }
+
+        // 2. Acción al pulsar "Solicitar Permiso"
+        btnPermiso.addEventListener('click', () => {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    btnPermiso.disabled = true;
+                    btnNotificar.disabled = false;
+                    estadoDiv.innerText = "¡Permiso concedido! Ya puedes lanzar el aviso.";
+                    estadoDiv.style.backgroundColor = "#ddffdd";
+                } else {
+                    estadoDiv.innerText = "Permiso denegado. Tienes que habilitarlo en el candado de la barra de direcciones.";
+                    estadoDiv.style.backgroundColor = "#ffdddd";
+                }
+            });
+        });
+
+        // 3. Acción al pulsar "Lanzar Aviso"
+        btnNotificar.addEventListener('click', () => {
+            estadoDiv.innerText = "Aviso enviado. Debería salir en la esquina de tu pantalla.";
+            estadoDiv.style.backgroundColor = "#e9ecef";
+            
+            // Aquí creamos la notificación nativa
+            const notificacion = new Notification("¡Aviso Urgente - Puesto 3!", {
+                body: "Por favor, coge la llamada en la extensión 2.",
+                icon: "https://cdn-icons-png.flaticon.com/512/1157/1157000.png", // Un icono genérico de campana
+                requireInteraction: true // Evita que la notificación desaparezca sola rápido en algunos navegadores
+            });
+
+            // 4. Detectar si el usuario hace clic en el cuadrito de la notificación
+            notificacion.onclick = function() {
+                estadoDiv.innerText = "¡Has hecho clic en la notificación! (En tu web final, esto marcaría el aviso como 'aceptado')";
+                estadoDiv.style.backgroundColor = "#ddffdd";
+                window.focus(); // Trae la pestaña del navegador al frente
+                this.close(); // Cierra el cuadrito de Windows
+            };
+        });
+    </script>
+
+</body>
+</html>
