@@ -2,245 +2,161 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Avisos Puestos</title>
+    <title>Avisos</title>
     <style>
-        :root { --primary: #2563eb; --danger: #dc2626; --bg: #f8fafc; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 500px; border: 1px solid #e2e8f0; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; font-size: 16px; }
-        button { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
-        button:hover { opacity: 0.9; }
-        .btn-danger { background: #475569; margin-top: 20px; }
-        .puestos-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
-        .badge { background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 500; }
-        #log { background: #1e293b; color: #f1f5f9; padding: 12px; border-radius: 6px; height: 150px; overflow-y: auto; font-family: monospace; font-size: 13px; margin-top: 15px; }
-        .hidden { display: none; }
+        body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; background: #f4f4f4; }
+        .caja { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        .oculto { display: none; }
+        #log { margin-top: 15px; font-size: 13px; color: #444; border-top: 1px solid #ccc; padding-top: 10px; }
     </style>
 </head>
 <body>
 
-<!-- PANTALLA DE ACCESO -->
-<div class="card" id="login-screen">
-    <h2 style="text-align: center; margin-top: 0;">Acceso al Sistema</h2>
-    <input type="number" id="num-puesto" placeholder="Tu número de puesto (Ej: 5)">
-    <input type="password" id="pass-sistema" placeholder="Contraseña de la red">
-    <button id="btn-entrar">Entrar</button>
+<!-- LOGIN -->
+<div id="pantalla-login" class="caja">
+    <h2>Entrar</h2>
+    <input type="number" id="puesto" placeholder="Nº de Puesto (Ej: 1)">
+    <input type="password" id="pass" placeholder="Contraseña">
+    <button onclick="entrar()">Conectar</button>
 </div>
 
-<!-- PANTALLA DE LA APLICACIÓN -->
-<div class="card hidden" id="app-screen">
-    <h2 id="header-puesto" style="margin-top: 0; color: #1e293b;">Puesto</h2>
+<!-- APLICACIÓN -->
+<div id="pantalla-app" class="caja oculto">
+    <h2 id="titulo"></h2>
+    <p>Conectados: <b id="conectados"></b></p>
     
-    <div style="background: #f1f5f9; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
-        <strong>Conectados ahora:</strong>
-        <div id="puestos-online" class="puestos-grid">Cargando...</div>
-    </div>
-    
-    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-    
-    <label style="font-weight: 600; color: #334155;">Enviar aviso a (separar por comas):</label>
-    <input type="text" id="lista-dest" placeholder="Ej: 5, 12, 14">
-    <button id="btn-enviar">ENVIAR AVISO URGENTE</button>
+    <input type="text" id="destinos" placeholder="Enviar a (Ej: 2, 3, 4)">
+    <button onclick="enviar()">ENVIAR AVISO</button>
     
     <div id="log"></div>
-    <button id="btn-salir" class="btn-danger">Cerrar Sesión / Cambiar Puesto</button>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, set, onValue, onDisconnect, push, update, get } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    // Fíjate que hemos añadido 'serverTimestamp' al final de la siguiente línea
+    import { getDatabase, ref, set, onValue, onDisconnect, push, update, get, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-    // ==========================================
-    // 1. PEGA AQUÍ TUS DATOS DE FIREBASE
-    // ==========================================
-const firebaseConfig = {
-  apiKey: "AIzaSyDPBayEwZnqLT07PRDrj5au1oDRXQAvBMw",
-  authDomain: "avisos-b81b6.firebaseapp.com",
-  databaseURL: "https://avisos-b81b6-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "avisos-b81b6",
-  storageBucket: "avisos-b81b6.firebasestorage.app",
-  messagingSenderId: "664826158550",
-  appId: "1:664826158550:web:5290f1c3d93ff256231877"
-};
+    // 1. TUS CLAVES DE FIREBASE
+    const db = getDatabase(initializeApp({
+        databaseURL: "https://TU_PROYECTO-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "TU_PROYECTO"
+        // (Pega aquí el resto de tus claves)
+    }));
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    // Variables y atajos útiles
+    let miPuesto, miPass;
+    const $ = (id) => document.getElementById(id);
+    const log = (msg) => $('log').innerHTML = `[${new Date().toLocaleTimeString()}] ${msg} <br>` + $('log').innerHTML;
 
-    let miPuesto = null;
-    let miPass = null;
-
-    // Recordar número de puesto de la sesión anterior
-    if(localStorage.getItem('puesto_guardado')) {
-        document.getElementById('num-puesto').value = localStorage.getItem('puesto_guardado');
-    }
-
-    // ==========================================
-    // 2. LÓGICA DE ENTRADA Y CONTRASEÑA
-    // ==========================================
-    document.getElementById('btn-entrar').addEventListener('click', async () => {
-        const inputPuesto = document.getElementById('num-puesto').value.trim();
-        const inputPass = document.getElementById('pass-sistema').value.trim();
-
-        if(!inputPuesto || !inputPass) return alert("Por favor, rellena todos los campos.");
+    // 2. FUNCIÓN PARA ENTRAR
+    window.entrar = async () => {
+        miPuesto = $('puesto').value;
+        miPass = $('pass').value;
+        if (!miPuesto || !miPass) return alert("Faltan datos");
 
         try {
-            // Intentamos registrarnos en Firebase. Si la clave es mala, Firebase dará error.
-            const statusRef = ref(db, 'conectados/puesto_' + inputPuesto);
-            await set(statusRef, { online: true, auth: inputPass });
-            
-            // Si llegamos a esta línea, la contraseña era CORRECTA
-            miPuesto = inputPuesto;
-            miPass = inputPass;
-            localStorage.setItem('puesto_guardado', miPuesto);
-            
-            // Pedimos permisos para notificaciones de Windows
-            if (Notification.permission !== "granted") Notification.requestPermission();
+            // A. Ponerse online
+            const miRef = ref(db, `conectados/puesto_${miPuesto}`);
+            await set(miRef, { online: true, auth: miPass }); 
+            onDisconnect(miRef).remove(); // Borrar mi luz verde al salir
 
-            // Cambiamos de pantalla
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('app-screen').classList.remove('hidden');
-            document.getElementById('header-puesto').innerText = "Puesto " + miPuesto;
+            // B. Guardar registro de CONEXIÓN en el historial
+            const refEntrada = push(ref(db, 'log_sesiones'));
+            set(refEntrada, { puesto: miPuesto, evento: "Conexión", timestamp: serverTimestamp(), auth: miPass });
 
-            // Configuramos qué pasa si se cierra la pestaña
-            onDisconnect(statusRef).remove();
+            // C. Preparar registro de DESCONEXIÓN automático
+            const refSalida = push(ref(db, 'log_sesiones'));
+            onDisconnect(refSalida).set({ puesto: miPuesto, evento: "Desconexión", timestamp: serverTimestamp(), auth: miPass });
+
+            // Cambiar de pantalla
+            $('pantalla-login').classList.add('oculto');
+            $('pantalla-app').classList.remove('oculto');
+            $('titulo').innerText = `Puesto ${miPuesto}`;
             
-            // Iniciamos la escucha de avisos y usuarios
-            iniciarApp();
-
-        } catch (error) {
-            alert("Acceso denegado: La contraseña es incorrecta.");
+            Notification.requestPermission();
+            iniciarEscuchas();
+        } catch(e) {
+            alert("Contraseña incorrecta");
         }
-    });
+    };
 
-    // ==========================================
-    // 3. LÓGICA PRINCIPAL (CONECTADOS Y AVISOS)
-    // ==========================================
-    function iniciarApp() {
-        // Escuchar quién está conectado
+    // 3. ESCUCHAR QUÉ PASA EN LA RED
+    function iniciarEscuchas() {
         onValue(ref(db, 'conectados'), (snap) => {
-            const data = snap.val();
-            let html = "";
-            for(let p in data) {
-                html += `<span class="badge">● ${p.replace('puesto_', '')}</span>`;
-            }
-            document.getElementById('puestos-online').innerHTML = html || "Solo tú";
+            let lista = [];
+            snap.forEach(hijo => lista.push(hijo.key.replace('puesto_', '')));
+            $('conectados').innerText = lista.join(', ') || "Solo tú";
         });
 
-        // Escuchar si me envían un aviso o si aceptan el mío
         onValue(ref(db, 'avisos'), (snap) => {
-            snap.forEach(child => {
-                const aviso = child.val();
-                
-                // PROTECCIÓN: Si el aviso está corrupto o es de una prueba vieja, lo ignoramos para que no rompa la web
-                if (!aviso || !aviso.lista || aviso.actual === undefined) return;
-                
-                // Me toca recibir a mí
-                if(aviso.estado === 'pendiente' && aviso.lista[aviso.actual] === miPuesto) {
-                    if(!sessionStorage.getItem('notif_'+aviso.id)) {
-                        sessionStorage.setItem('notif_'+aviso.id, 'true');
-                        lanzarNotificacionWindows(aviso);
+            snap.forEach(hijo => {
+                const aviso = hijo.val();
+                if (!aviso || !aviso.lista) return;
+
+                if (aviso.estado === 'pendiente' && aviso.lista[aviso.actual] === miPuesto) {
+                    if (!sessionStorage.getItem(hijo.key)) {
+                        sessionStorage.setItem(hijo.key, 'notificado');
+                        lanzarNotificacion(aviso.emisor, hijo.key);
                     }
                 }
-                
-                // Alguien aceptó el aviso que yo envié
-                if(aviso.emisor === miPuesto && aviso.estado && aviso.estado.startsWith('aceptado_')) {
-                    const aceptador = aviso.estado.replace('aceptado_', '');
-                    if(!sessionStorage.getItem('log_aceptado_'+aviso.id)) {
-                        sessionStorage.setItem('log_aceptado_'+aviso.id, 'true');
-                        escribirLog(`✅ El Puesto ${aceptador} HA ACEPTADO tu aviso.`);
+
+                if (aviso.emisor === miPuesto && aviso.estado.includes('aceptado_')) {
+                    if (!sessionStorage.getItem('log_'+hijo.key)) {
+                        sessionStorage.setItem('log_'+hijo.key, 'ok');
+                        log(`✅ Puesto ${aviso.estado.split('_')[1]} aceptó el aviso.`);
                     }
                 }
             });
         });
     }
 
-    // ==========================================
-    // 4. ENVIAR AVISOS Y CASCADA DE 12 SEGUNDOS
-    // ==========================================
-    document.getElementById('btn-enviar').addEventListener('click', () => {
-        const dests = document.getElementById('lista-dest').value.split(',').map(s => s.trim()).filter(s => s !== "");
-        if(dests.length === 0) return alert("Escribe al menos un destinatario.");
+    // 4. ENVIAR AVISO
+    window.enviar = () => {
+        const dests = $('destinos').value.split(',').map(s => s.trim()).filter(Boolean);
+        if (!dests.length) return alert("Pon destinatarios");
 
-        const nuevoRef = push(ref(db, 'avisos'));
-        const avisoData = {
-            id: nuevoRef.key,
-            emisor: miPuesto,
-            lista: dests,
-            actual: 0,
-            estado: 'pendiente',
-            timestamp: Date.now(),
-            auth: miPass // Adjuntamos la clave para que Firebase nos deje escribir
-        };
+        const nuevoAviso = push(ref(db, 'avisos'));
+        set(nuevoAviso, { 
+            emisor: miPuesto, 
+            lista: dests, 
+            actual: 0, 
+            estado: 'pendiente', 
+            timestamp: serverTimestamp(), // Aprovechamos para guardar la hora exacta del aviso
+            auth: miPass 
+        });
+        cascada(nuevoAviso.key, dests, 0);
+    };
 
-        set(nuevoRef, avisoData);
-        gestionarCascada(nuevoRef.key, dests, 0);
-    });
-
-    function gestionarCascada(id, lista, idx) {
-        escribirLog(`Aviso enviado a Puesto ${lista[idx]}. Esperando respuesta...`);
+    // 5. CASCADA (12 Segundos)
+    function cascada(id, lista, indice) {
+        log(`Enviando a Puesto ${lista[indice]}...`);
         
         setTimeout(async () => {
             const snap = await get(ref(db, `avisos/${id}`));
             const aviso = snap.val();
-
-            // Si después de 12 segundos sigue pendiente, y el destinatario es el mismo
-            if(aviso && aviso.estado === 'pendiente' && aviso.actual === idx) {
-                const proximoIdx = idx + 1;
-                
-                if(proximoIdx < lista.length) {
-                    escribirLog(`⏳ Puesto ${lista[idx]} no respondió. Pasando a Puesto ${lista[proximoIdx]}...`);
-                    update(ref(db, `avisos/${id}`), { actual: proximoIdx, auth: miPass });
-                    gestionarCascada(id, lista, proximoIdx);
+            
+            if (aviso && aviso.estado === 'pendiente' && aviso.actual === indice) {
+                if (indice + 1 < lista.length) {
+                    update(ref(db, `avisos/${id}`), { actual: indice + 1, auth: miPass });
+                    cascada(id, lista, indice + 1);
                 } else {
-                    escribirLog(`❌ Aviso finalizado. Ningún puesto respondió.`);
                     update(ref(db, `avisos/${id}`), { estado: 'caducado', auth: miPass });
+                    log("❌ Fin. Nadie respondió.");
                 }
             }
-        }, 12000); // 12000 milisegundos = 12 segundos
+        }, 12000); 
     }
 
-    // ==========================================
-    // 5. NOTIFICACIONES DE WINDOWS
-    // ==========================================
-    function lanzarNotificacionWindows(aviso) {
-        if (Notification.permission === "granted") {
-            const n = new Notification(`¡URGENTE: AVISO DEL PUESTO ${aviso.emisor}!`, {
-                body: "Haz clic en esta alerta para ACEPTAR el aviso.",
-                requireInteraction: true
-            });
-            
-            n.onclick = () => {
-                // Al hacer clic, enviamos a Firebase que lo hemos aceptado
-                update(ref(db, `avisos/${aviso.id}`), { 
-                    estado: 'aceptado_' + miPuesto,
-                    auth: miPass 
-                });
-                n.close();
-                window.focus(); // Trae la ventana del navegador al frente
-                alert("¡Has aceptado el aviso con éxito!");
-            };
-        } else {
-            alert(`Tienes un aviso urgente del Puesto ${aviso.emisor}. (Activa las notificaciones en tu navegador)`);
-        }
+    // 6. NOTIFICACIÓN DE WINDOWS
+    function lanzarNotificacion(emisor, idAviso) {
+        const n = new Notification(`AVISO DE PUESTO ${emisor}`, { body: "Haz clic para aceptar" });
+        n.onclick = () => {
+            update(ref(db, `avisos/${idAviso}`), { estado: `aceptado_${miPuesto}`, auth: miPass });
+            n.close();
+        };
     }
-
-    // ==========================================
-    // 6. UTILIDADES
-    // ==========================================
-    function escribirLog(mensaje) {
-        const cajaLog = document.getElementById('log');
-        const hora = new Date().toLocaleTimeString();
-        cajaLog.innerHTML = `<div><span style="color:#94a3b8">[${hora}]</span> ${mensaje}</div>` + cajaLog.innerHTML;
-    }
-
-    document.getElementById('btn-salir').addEventListener('click', async () => {
-        // Borramos mi estado de online antes de recargar
-        if(miPuesto && miPass) {
-            await set(ref(db, 'conectados/puesto_' + miPuesto), null);
-        }
-        location.reload();
-    });
 </script>
 
 </body>
