@@ -7,13 +7,13 @@
         body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; background: #f4f4f4; }
         .caja { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         input, button { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
         .oculto { display: none; }
         #log { margin-top: 15px; font-size: 13px; color: #444; border-top: 1px solid #ccc; padding-top: 10px; }
         
-        /* Etiquetas para los puestos online */
-        .grid { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; margin-bottom: 15px; }
-        .badge { background: #28a745; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        /* Etiquetas para los puestos online (ahora un poco más redondas para los números sueltos) */
+        .grid { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; margin-bottom: 15px; }
+        .badge { background: #28a745; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -30,7 +30,7 @@
 <div id="pantalla-app" class="caja oculto">
     <h2 id="titulo"></h2>
     
-    <label style="font-size: 14px; font-weight: bold; color: #555;">Puestos conectados:</label>
+    <label style="font-size: 14px; font-weight: bold; color: #555;">Conectados ahora:</label>
     <div id="grid-puestos" class="grid"></div>
     
     <input type="text" id="destinos" placeholder="Enviar a (Ej: 2, 3, 4)">
@@ -61,6 +61,11 @@
     const $ = (id) => document.getElementById(id);
     const log = (msg) => $('log').innerHTML = `[${new Date().toLocaleTimeString()}] ${msg} <br>` + $('log').innerHTML;
 
+    // --- NOVEDAD: Recuperar el último puesto usado al cargar la página ---
+    if (localStorage.getItem('ultimo_puesto')) {
+        $('puesto').value = localStorage.getItem('ultimo_puesto');
+    }
+
     // 2. FUNCIÓN PARA ENTRAR
     window.entrar = async () => {
         miPuesto = $('puesto').value;
@@ -78,6 +83,9 @@
             const refSalida = push(ref(db, 'log_sesiones'));
             onDisconnect(refSalida).set({ puesto: miPuesto, evento: "Desconexión", timestamp: serverTimestamp(), auth: miPass });
 
+            // --- NOVEDAD: Guardar el puesto para la próxima vez ---
+            localStorage.setItem('ultimo_puesto', miPuesto);
+
             $('pantalla-login').classList.add('oculto');
             $('pantalla-app').classList.remove('oculto');
             $('titulo').innerText = `Puesto ${miPuesto}`;
@@ -91,12 +99,12 @@
 
     // 3. ESCUCHAR QUÉ PASA EN LA RED
     function iniciarEscuchas() {
-        // --- DIBUJAR PUESTOS ONLINE DINÁMICAMENTE ---
+        // --- DIBUJAR PUESTOS ONLINE (SOLO EL NÚMERO) ---
         onValue(ref(db, 'conectados'), (snap) => {
             let html = "";
             snap.forEach(hijo => {
                 const num = hijo.key.replace('puesto_', '');
-                html += `<div class="badge">${num}</div>`;
+                html += `<div class="badge">${num}</div>`; // Quitamos el "P-"
             });
             $('grid-puestos').innerHTML = html || "<span style='font-size:13px;color:#888;'>Solo tú</span>";
         });
@@ -132,7 +140,7 @@
         const nuevoAviso = push(ref(db, 'avisos'));
         set(nuevoAviso, { emisor: miPuesto, lista: dests, actual: 0, estado: 'pendiente', timestamp: serverTimestamp(), auth: miPass });
         cascada(nuevoAviso.key, dests, 0);
-        $('destinos').value = ''; // Limpiar el campo de texto tras enviar
+        $('destinos').value = ''; 
     };
 
     // 5. CASCADA (12 Segundos)
