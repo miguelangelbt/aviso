@@ -11,11 +11,9 @@
         .oculto { display: none; }
         #log { margin-top: 15px; font-size: 13px; color: #444; border-top: 1px solid #ccc; padding-top: 10px; }
         
-        /* Estilos nuevos para los puestos (Verde/Gris) */
-        .grid { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 15px; }
-        .badge { padding: 6px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
-        .on { background: #28a745; } /* Verde = Conectado */
-        .off { background: #cbd5e1; } /* Gris = Desconectado */
+        /* Etiquetas para los puestos online */
+        .grid { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; margin-bottom: 15px; }
+        .badge { background: #28a745; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -32,7 +30,7 @@
 <div id="pantalla-app" class="caja oculto">
     <h2 id="titulo"></h2>
     
-    <!-- Aquí se dibujarán los cuadritos verdes y grises -->
+    <label style="font-size: 14px; font-weight: bold; color: #555;">Puestos conectados:</label>
     <div id="grid-puestos" class="grid"></div>
     
     <input type="text" id="destinos" placeholder="Enviar a (Ej: 2, 3, 4)">
@@ -60,7 +58,6 @@
 
     // Variables y atajos
     let miPuesto, miPass;
-    const MAX_PUESTOS = 20; // <--- AJUSTA ESTO AL TOTAL DE PUESTOS QUE TIENES
     const $ = (id) => document.getElementById(id);
     const log = (msg) => $('log').innerHTML = `[${new Date().toLocaleTimeString()}] ${msg} <br>` + $('log').innerHTML;
 
@@ -94,17 +91,14 @@
 
     // 3. ESCUCHAR QUÉ PASA EN LA RED
     function iniciarEscuchas() {
-        // --- DIBUJAR PUESTOS (VERDE/GRIS) ---
+        // --- DIBUJAR PUESTOS ONLINE DINÁMICAMENTE ---
         onValue(ref(db, 'conectados'), (snap) => {
-            const online = [];
-            snap.forEach(hijo => online.push(parseInt(hijo.key.replace('puesto_', ''))));
-
             let html = "";
-            for(let i = 1; i <= MAX_PUESTOS; i++) {
-                const clase = online.includes(i) ? 'on' : 'off';
-                html += `<div class="badge ${clase}">P-${i}</div>`;
-            }
-            $('grid-puestos').innerHTML = html;
+            snap.forEach(hijo => {
+                const num = hijo.key.replace('puesto_', '');
+                html += `<div class="badge">P-${num}</div>`;
+            });
+            $('grid-puestos').innerHTML = html || "<span style='font-size:13px;color:#888;'>Solo tú</span>";
         });
 
         // --- ESCUCHAR AVISOS ---
@@ -138,6 +132,7 @@
         const nuevoAviso = push(ref(db, 'avisos'));
         set(nuevoAviso, { emisor: miPuesto, lista: dests, actual: 0, estado: 'pendiente', timestamp: serverTimestamp(), auth: miPass });
         cascada(nuevoAviso.key, dests, 0);
+        $('destinos').value = ''; // Limpiar el campo de texto tras enviar
     };
 
     // 5. CASCADA (12 Segundos)
