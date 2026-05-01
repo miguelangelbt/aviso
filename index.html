@@ -132,6 +132,9 @@ const firebaseConfig = {
             snap.forEach(child => {
                 const aviso = child.val();
                 
+                // PROTECCIÓN: Si el aviso está corrupto o es de una prueba vieja, lo ignoramos para que no rompa la web
+                if (!aviso || !aviso.lista || aviso.actual === undefined) return;
+                
                 // Me toca recibir a mí
                 if(aviso.estado === 'pendiente' && aviso.lista[aviso.actual] === miPuesto) {
                     if(!sessionStorage.getItem('notif_'+aviso.id)) {
@@ -141,7 +144,7 @@ const firebaseConfig = {
                 }
                 
                 // Alguien aceptó el aviso que yo envié
-                if(aviso.emisor === miPuesto && aviso.estado.startsWith('aceptado_')) {
+                if(aviso.emisor === miPuesto && aviso.estado && aviso.estado.startsWith('aceptado_')) {
                     const aceptador = aviso.estado.replace('aceptado_', '');
                     if(!sessionStorage.getItem('log_aceptado_'+aviso.id)) {
                         sessionStorage.setItem('log_aceptado_'+aviso.id, 'true');
