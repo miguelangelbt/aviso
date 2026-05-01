@@ -11,9 +11,9 @@
         .oculto { display: none; }
         #log { margin-top: 15px; font-size: 13px; color: #444; border-top: 1px solid #ccc; padding-top: 10px; }
         
-        /* Etiquetas para los puestos online (ahora un poco más redondas para los números sueltos) */
         .grid { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; margin-bottom: 15px; }
         .badge { background: #28a745; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+        .etiqueta { font-size: 14px; font-weight: bold; color: #555; display: block; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -30,10 +30,11 @@
 <div id="pantalla-app" class="caja oculto">
     <h2 id="titulo"></h2>
     
-    <label style="font-size: 14px; font-weight: bold; color: #555;">Conectados ahora:</label>
+    <label class="etiqueta">Conectados ahora:</label>
     <div id="grid-puestos" class="grid"></div>
     
-    <input type="text" id="destinos" placeholder="Enviar a (Ej: 2, 3, 4)">
+    <label class="etiqueta">Destinatarios del aviso:</label>
+    <input type="text" id="destinos" placeholder="Ej: 2, 3, 4">
     <button onclick="enviar()">ENVIAR AVISO</button>
     
     <div id="log"></div>
@@ -61,10 +62,9 @@
     const $ = (id) => document.getElementById(id);
     const log = (msg) => $('log').innerHTML = `[${new Date().toLocaleTimeString()}] ${msg} <br>` + $('log').innerHTML;
 
-    // --- NOVEDAD: Recuperar el último puesto usado al cargar la página ---
-    if (localStorage.getItem('ultimo_puesto')) {
-        $('puesto').value = localStorage.getItem('ultimo_puesto');
-    }
+    // --- RECUPERAR MEMORIA ---
+    if (localStorage.getItem('ultimo_puesto')) $('puesto').value = localStorage.getItem('ultimo_puesto');
+    if (localStorage.getItem('ultimos_destinos')) $('destinos').value = localStorage.getItem('ultimos_destinos');
 
     // 2. FUNCIÓN PARA ENTRAR
     window.entrar = async () => {
@@ -83,7 +83,7 @@
             const refSalida = push(ref(db, 'log_sesiones'));
             onDisconnect(refSalida).set({ puesto: miPuesto, evento: "Desconexión", timestamp: serverTimestamp(), auth: miPass });
 
-            // --- NOVEDAD: Guardar el puesto para la próxima vez ---
+            // Guardar el puesto en memoria
             localStorage.setItem('ultimo_puesto', miPuesto);
 
             $('pantalla-login').classList.add('oculto');
@@ -99,17 +99,15 @@
 
     // 3. ESCUCHAR QUÉ PASA EN LA RED
     function iniciarEscuchas() {
-        // --- DIBUJAR PUESTOS ONLINE (SOLO EL NÚMERO) ---
         onValue(ref(db, 'conectados'), (snap) => {
             let html = "";
             snap.forEach(hijo => {
                 const num = hijo.key.replace('puesto_', '');
-                html += `<div class="badge">${num}</div>`; // Quitamos el "P-"
+                html += `<div class="badge">${num}</div>`;
             });
             $('grid-puestos').innerHTML = html || "<span style='font-size:13px;color:#888;'>Solo tú</span>";
         });
 
-        // --- ESCUCHAR AVISOS ---
         onValue(ref(db, 'avisos'), (snap) => {
             snap.forEach(hijo => {
                 const aviso = hijo.val();
@@ -137,10 +135,12 @@
         const dests = $('destinos').value.split(',').map(s => s.trim()).filter(Boolean);
         if (!dests.length) return alert("Pon destinatarios");
 
+        // Guardar destinos en memoria para la próxima vez
+        localStorage.setItem('ultimos_destinos', $('destinos').value);
+
         const nuevoAviso = push(ref(db, 'avisos'));
         set(nuevoAviso, { emisor: miPuesto, lista: dests, actual: 0, estado: 'pendiente', timestamp: serverTimestamp(), auth: miPass });
         cascada(nuevoAviso.key, dests, 0);
-        $('destinos').value = ''; 
     };
 
     // 5. CASCADA (12 Segundos)
