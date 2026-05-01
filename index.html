@@ -83,7 +83,6 @@
             const refSalida = push(ref(db, 'log_sesiones'));
             onDisconnect(refSalida).set({ puesto: miPuesto, evento: "Desconexión", timestamp: serverTimestamp(), auth: miPass });
 
-            // Guardar el puesto en memoria
             localStorage.setItem('ultimo_puesto', miPuesto);
 
             $('pantalla-login').classList.add('oculto');
@@ -91,6 +90,7 @@
             $('titulo').innerText = `Puesto ${miPuesto}`;
             
             Notification.requestPermission();
+            log(`🟢 Has iniciado sesión en el Puesto ${miPuesto}`);
             iniciarEscuchas();
         } catch(e) {
             alert("Contraseña incorrecta");
@@ -113,17 +113,34 @@
                 const aviso = hijo.val();
                 if (!aviso || !aviso.lista) return;
 
+                // A) ME TOCA RECIBIRLO A MÍ
                 if (aviso.estado === 'pendiente' && aviso.lista[aviso.actual] == miPuesto) {
                     if (!sessionStorage.getItem(hijo.key)) {
                         sessionStorage.setItem(hijo.key, 'notificado');
+                        log(`🔔 RECIBIDO: Aviso urgente del Puesto ${aviso.emisor}.`);
                         lanzarNotificacion(aviso.emisor, hijo.key);
                     }
                 }
 
+                // B) SE ME PASÓ EL TURNO (No lo acepté a tiempo y saltó al siguiente, o caducó)
+                if (sessionStorage.getItem(hijo.key) === 'notificado') {
+                    // Si ya no está pendiente o el turno actual ya no es el mío
+                    if (aviso.estado !== 'pendiente' || aviso.lista[aviso.actual] != miPuesto) {
+                        if (!sessionStorage.getItem('fin_'+hijo.key)) {
+                            sessionStorage.setItem('fin_'+hijo.key, 'true');
+                            // Verificamos que no sea porque YO lo he aceptado
+                            if (aviso.estado !== `aceptado_${miPuesto}`) {
+                                log(`⏭️ TIEMPO AGOTADO: El aviso del Puesto ${aviso.emisor} ha pasado al siguiente o finalizado.`);
+                            }
+                        }
+                    }
+                }
+
+                // C) YO SOY EL EMISOR Y ALGUIEN LO HA ACEPTADO
                 if (aviso.emisor == miPuesto && aviso.estado.includes('aceptado_')) {
                     if (!sessionStorage.getItem('log_'+hijo.key)) {
                         sessionStorage.setItem('log_'+hijo.key, 'ok');
-                        log(`✅ Puesto ${aviso.estado.split('_')[1]} aceptó el aviso.`);
+                        log(`✅ Puesto ${aviso.estado.split('_')[1]} aceptó tu aviso.`);
                     }
                 }
             });
@@ -135,7 +152,6 @@
         const dests = $('destinos').value.split(',').map(s => s.trim()).filter(Boolean);
         if (!dests.length) return alert("Pon destinatarios");
 
-        // Guardar destinos en memoria para la próxima vez
         localStorage.setItem('ultimos_destinos', $('destinos').value);
 
         const nuevoAviso = push(ref(db, 'avisos'));
@@ -145,7 +161,7 @@
 
     // 5. CASCADA (12 Segundos)
     function cascada(id, lista, indice) {
-        log(`Enviando a Puesto ${lista[indice]}...`);
+        log(`📤 Enviando a Puesto ${lista[indice]}...`);
         
         setTimeout(async () => {
             const snap = await get(ref(db, `avisos/${id}`));
@@ -157,7 +173,7 @@
                     cascada(id, lista, indice + 1);
                 } else {
                     update(ref(db, `avisos/${id}`), { estado: 'caducado', auth: miPass });
-                    log("❌ Fin. Nadie respondió.");
+                    log("❌ FIN: Nadie ha respondido a tu aviso.");
                 }
             }
         }, 12000); 
@@ -168,6 +184,7 @@
         const n = new Notification(`AVISO DE PUESTO ${emisor}`, { body: "Haz clic para aceptar" });
         n.onclick = () => {
             update(ref(db, `avisos/${idAviso}`), { estado: `aceptado_${miPuesto}`, auth: miPass });
+            log(`✅ ACEPTADO: Has confirmado el aviso del Puesto ${emisor}.`);
             n.close();
         };
     }
