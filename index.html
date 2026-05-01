@@ -155,7 +155,6 @@
 
     // 4. ENVIAR AVISO
     window.enviar = () => {
-        // ---> NOVEDAD: Ahora cortamos por comas o por puntos ( /[.,]/ )
         const dests = $('destinos').value.split(/[.,]/).map(s => s.trim()).filter(Boolean);
         if (!dests.length) return alert("Pon destinatarios");
 
@@ -186,14 +185,23 @@
         }, 12000); 
     }
 
-    // 6. NOTIFICACIÓN DE WINDOWS
+    // 6. NOTIFICACIÓN DE WINDOWS MEJORADA
     function lanzarNotificacion(emisor, idAviso) {
-        const n = new Notification(`AVISO DE PUESTO ${emisor}`, { body: "Haz clic para aceptar" });
+        const n = new Notification(`AVISO DE PUESTO ${emisor}`, { 
+            body: "Haz clic para aceptar",
+            requireInteraction: true // <--- ESTO MANTIENE LA NOTIFICACIÓN FIJA
+        });
+        
         n.onclick = () => {
             update(ref(db, `avisos/${idAviso}`), { estado: `aceptado_${miPuesto}`, auth: miPass });
             log(`✅ ACEPTADO: Has confirmado el aviso del Puesto ${emisor}.`);
             n.close();
         };
+
+        // Cerramos la notificación sola si se pasan los 12 segundos
+        setTimeout(() => {
+            n.close();
+        }, 12000);
     }
 </script>
 
