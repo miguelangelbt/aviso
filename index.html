@@ -34,7 +34,7 @@
     <div id="grid-puestos" class="grid"></div>
     
     <label class="etiqueta">Destinatarios del aviso:</label>
-    <input type="text" id="destinos" placeholder="Ej: 2, 3, 4">
+    <input type="text" id="destinos" placeholder="Ej: 2, 3 o 2.3">
     <button onclick="enviar()">ENVIAR AVISO</button>
     
     <div id="log"></div>
@@ -72,8 +72,7 @@
         miPass = $('pass').value;
         if (!miPuesto || !miPass) return alert("Faltan datos");
 
-        // ---> LIMPIEZA DE MEMORIA TEMPORAL PARA EVITAR MENSAJES FANTASMA <---
-        sessionStorage.clear();
+        sessionStorage.clear(); // Limpiamos la memoria de la sesión anterior
 
         try {
             const miRef = ref(db, `conectados/puesto_${miPuesto}`);
@@ -111,6 +110,8 @@
             $('grid-puestos').innerHTML = html || "<span style='font-size:13px;color:#888;'>Solo tú</span>";
         });
 
+        let primeraCarga = true; 
+
         onValue(ref(db, 'avisos'), (snap) => {
             snap.forEach(hijo => {
                 const aviso = hijo.val();
@@ -130,7 +131,7 @@
                     if (aviso.estado !== 'pendiente' || aviso.lista[aviso.actual] != miPuesto) {
                         if (!sessionStorage.getItem('fin_'+hijo.key)) {
                             sessionStorage.setItem('fin_'+hijo.key, 'true');
-                            if (aviso.estado !== `aceptado_${miPuesto}`) {
+                            if (aviso.estado !== `aceptado_${miPuesto}` && !primeraCarga) {
                                 log(`⏭️ TIEMPO AGOTADO: El aviso del Puesto ${aviso.emisor} ha pasado al siguiente o finalizado.`);
                             }
                         }
@@ -141,16 +142,21 @@
                 if (aviso.emisor == miPuesto && aviso.estado.includes('aceptado_')) {
                     if (!sessionStorage.getItem('log_'+hijo.key)) {
                         sessionStorage.setItem('log_'+hijo.key, 'ok');
-                        log(`✅ Puesto ${aviso.estado.split('_')[1]} aceptó tu aviso.`);
+                        if (!primeraCarga) {
+                            log(`✅ Puesto ${aviso.estado.split('_')[1]} aceptó tu aviso.`);
+                        }
                     }
                 }
             });
+            
+            primeraCarga = false; 
         });
     }
 
     // 4. ENVIAR AVISO
     window.enviar = () => {
-        const dests = $('destinos').value.split(',').map(s => s.trim()).filter(Boolean);
+        // ---> NOVEDAD: Ahora cortamos por comas o por puntos ( /[.,]/ )
+        const dests = $('destinos').value.split(/[.,]/).map(s => s.trim()).filter(Boolean);
         if (!dests.length) return alert("Pon destinatarios");
 
         localStorage.setItem('ultimos_destinos', $('destinos').value);
