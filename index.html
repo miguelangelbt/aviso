@@ -72,6 +72,9 @@
         miPass = $('pass').value;
         if (!miPuesto || !miPass) return alert("Faltan datos");
 
+        // ---> LIMPIEZA DE MEMORIA TEMPORAL PARA EVITAR MENSAJES FANTASMA <---
+        sessionStorage.clear();
+
         try {
             const miRef = ref(db, `conectados/puesto_${miPuesto}`);
             await set(miRef, { online: true, auth: miPass }); 
@@ -122,13 +125,11 @@
                     }
                 }
 
-                // B) SE ME PASÓ EL TURNO (No lo acepté a tiempo y saltó al siguiente, o caducó)
+                // B) SE ME PASÓ EL TURNO
                 if (sessionStorage.getItem(hijo.key) === 'notificado') {
-                    // Si ya no está pendiente o el turno actual ya no es el mío
                     if (aviso.estado !== 'pendiente' || aviso.lista[aviso.actual] != miPuesto) {
                         if (!sessionStorage.getItem('fin_'+hijo.key)) {
                             sessionStorage.setItem('fin_'+hijo.key, 'true');
-                            // Verificamos que no sea porque YO lo he aceptado
                             if (aviso.estado !== `aceptado_${miPuesto}`) {
                                 log(`⏭️ TIEMPO AGOTADO: El aviso del Puesto ${aviso.emisor} ha pasado al siguiente o finalizado.`);
                             }
