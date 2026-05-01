@@ -39,11 +39,15 @@
     import { getDatabase, ref, set, onValue, onDisconnect, push, update, get, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
     // 1. TUS CLAVES DE FIREBASE
-    const db = getDatabase(initializeApp({
-        databaseURL: "https://TU_PROYECTO-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "TU_PROYECTO"
-        // (Pega aquí el resto de tus claves)
-    }));
+const db = {
+  apiKey: "AIzaSyDPBayEwZnqLT07PRDrj5au1oDRXQAvBMw",
+  authDomain: "avisos-b81b6.firebaseapp.com",
+  databaseURL: "https://avisos-b81b6-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "avisos-b81b6",
+  storageBucket: "avisos-b81b6.firebasestorage.app",
+  messagingSenderId: "664826158550",
+  appId: "1:664826158550:web:5290f1c3d93ff256231877"
+};
 
     // Variables y atajos útiles
     let miPuesto, miPass;
