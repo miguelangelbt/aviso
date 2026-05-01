@@ -10,6 +10,12 @@
         button { background: #007bff; color: white; border: none; cursor: pointer; }
         .oculto { display: none; }
         #log { margin-top: 15px; font-size: 13px; color: #444; border-top: 1px solid #ccc; padding-top: 10px; }
+        
+        /* Estilos nuevos para los puestos (Verde/Gris) */
+        .grid { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 15px; }
+        .badge { padding: 6px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
+        .on { background: #28a745; } /* Verde = Conectado */
+        .off { background: #cbd5e1; } /* Gris = Desconectado */
     </style>
 </head>
 <body>
@@ -25,7 +31,9 @@
 <!-- APLICACIÓN -->
 <div id="pantalla-app" class="caja oculto">
     <h2 id="titulo"></h2>
-    <p>Conectados: <b id="conectados"></b></p>
+    
+    <!-- Aquí se dibujarán los cuadritos verdes y grises -->
+    <div id="grid-puestos" class="grid"></div>
     
     <input type="text" id="destinos" placeholder="Enviar a (Ej: 2, 3, 4)">
     <button onclick="enviar()">ENVIAR AVISO</button>
@@ -37,7 +45,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, set, onValue, onDisconnect, push, update, get, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-    // 1. TUS CLAVES DE FIREBASE (¡Ahora sí están encendiendo la base de datos!)
+    // 1. TUS CLAVES DE FIREBASE
     const firebaseConfig = {
       apiKey: "AIzaSyDPBayEwZnqLT07PRDrj5au1oDRXQAvBMw",
       authDomain: "avisos-b81b6.firebaseapp.com",
@@ -48,11 +56,11 @@
       appId: "1:664826158550:web:5290f1c3d93ff256231877"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    const db = getDatabase(initializeApp(firebaseConfig));
 
-    // Variables y atajos útiles
+    // Variables y atajos
     let miPuesto, miPass;
+    const MAX_PUESTOS = 20; // <--- AJUSTA ESTO AL TOTAL DE PUESTOS QUE TIENES
     const $ = (id) => document.getElementById(id);
     const log = (msg) => $('log').innerHTML = `[${new Date().toLocaleTimeString()}] ${msg} <br>` + $('log').innerHTML;
 
@@ -63,20 +71,16 @@
         if (!miPuesto || !miPass) return alert("Faltan datos");
 
         try {
-            // A. Ponerse online
             const miRef = ref(db, `conectados/puesto_${miPuesto}`);
             await set(miRef, { online: true, auth: miPass }); 
-            onDisconnect(miRef).remove(); // Borrar mi luz verde al salir
+            onDisconnect(miRef).remove(); 
 
-            // B. Guardar registro de CONEXIÓN en el historial
             const refEntrada = push(ref(db, 'log_sesiones'));
             set(refEntrada, { puesto: miPuesto, evento: "Conexión", timestamp: serverTimestamp(), auth: miPass });
 
-            // C. Preparar registro de DESCONEXIÓN automático
             const refSalida = push(ref(db, 'log_sesiones'));
             onDisconnect(refSalida).set({ puesto: miPuesto, evento: "Desconexión", timestamp: serverTimestamp(), auth: miPass });
 
-            // Cambiar de pantalla
             $('pantalla-login').classList.add('oculto');
             $('pantalla-app').classList.remove('oculto');
             $('titulo').innerText = `Puesto ${miPuesto}`;
@@ -90,25 +94,33 @@
 
     // 3. ESCUCHAR QUÉ PASA EN LA RED
     function iniciarEscuchas() {
+        // --- DIBUJAR PUESTOS (VERDE/GRIS) ---
         onValue(ref(db, 'conectados'), (snap) => {
-            let lista = [];
-            snap.forEach(hijo => lista.push(hijo.key.replace('puesto_', '')));
-            $('conectados').innerText = lista.join(', ') || "Solo tú";
+            const online = [];
+            snap.forEach(hijo => online.push(parseInt(hijo.key.replace('puesto_', ''))));
+
+            let html = "";
+            for(let i = 1; i <= MAX_PUESTOS; i++) {
+                const clase = online.includes(i) ? 'on' : 'off';
+                html += `<div class="badge ${clase}">P-${i}</div>`;
+            }
+            $('grid-puestos').innerHTML = html;
         });
 
+        // --- ESCUCHAR AVISOS ---
         onValue(ref(db, 'avisos'), (snap) => {
             snap.forEach(hijo => {
                 const aviso = hijo.val();
                 if (!aviso || !aviso.lista) return;
 
-                if (aviso.estado === 'pendiente' && aviso.lista[aviso.actual] === miPuesto) {
+                if (aviso.estado === 'pendiente' && aviso.lista[aviso.actual] == miPuesto) {
                     if (!sessionStorage.getItem(hijo.key)) {
                         sessionStorage.setItem(hijo.key, 'notificado');
                         lanzarNotificacion(aviso.emisor, hijo.key);
                     }
                 }
 
-                if (aviso.emisor === miPuesto && aviso.estado.includes('aceptado_')) {
+                if (aviso.emisor == miPuesto && aviso.estado.includes('aceptado_')) {
                     if (!sessionStorage.getItem('log_'+hijo.key)) {
                         sessionStorage.setItem('log_'+hijo.key, 'ok');
                         log(`✅ Puesto ${aviso.estado.split('_')[1]} aceptó el aviso.`);
@@ -124,14 +136,7 @@
         if (!dests.length) return alert("Pon destinatarios");
 
         const nuevoAviso = push(ref(db, 'avisos'));
-        set(nuevoAviso, { 
-            emisor: miPuesto, 
-            lista: dests, 
-            actual: 0, 
-            estado: 'pendiente', 
-            timestamp: serverTimestamp(),
-            auth: miPass 
-        });
+        set(nuevoAviso, { emisor: miPuesto, lista: dests, actual: 0, estado: 'pendiente', timestamp: serverTimestamp(), auth: miPass });
         cascada(nuevoAviso.key, dests, 0);
     };
 
